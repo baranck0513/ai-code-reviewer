@@ -6,7 +6,7 @@ A Spring Boot application that performs code analysis using Claude AI
 
 - **AI-Powered Analysis** - Code review with Claude API
 - **Multi-Language Support** - Java, Python, JavaScript, TypeScript, C#, C++, Go, PHP
-- **Web Interface** - Easy-to-use frontend
+- **Web Interface**
 - **Review History** - View past reviews
 - **REST API** - API endpoints for integration
 
