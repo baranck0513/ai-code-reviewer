@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Code Reviewer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        .review-content h1, .review-content h2, .review-content h3 { font-weight: 600; margin: 1rem 0 0.5rem; }
+        .review-content h1 { font-size: 1.25rem; }
+        .review-content h2 { font-size: 1.1rem; }
+        .review-content pre { background: #1f2937; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; margin: 0.5rem 0; }
+        .review-content code { background: #374151; padding: 0.125rem 0.375rem; border-radius: 0.25rem; font-size: 0.875rem; }
+        .review-content pre code { background: transparent; padding: 0; }
+        .review-content ul, .review-content ol { margin-left: 1.5rem; }
+        .review-content li { margin-bottom: 0.25rem; }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen p-6">
+<div class="max-w-5xl mx-auto">
+    <!-- Header -->
+    <h1 class="text-2xl font-bold text-center mb-6">AI Code Reviewer</h1>
+
+    <div class="grid md:grid-cols-2 gap-6">
+        <!-- Left Panel - Input -->
+        <div class="bg-gray-800 rounded-lg p-5">
+            <h2 class="font-semibold mb-4">Submit Code</h2>
+
+            <!-- Language Selection -->
+            <div class="mb-3">
+                <label class="block text-sm mb-1">Language</label>
+                <select id="language" class="w-full bg-gray-700 rounded px-3 py-2">
+                    <option value="java">Java</option>
+                    <option value="python">Python</option>
+                    <option value="javascript">JavaScript</option>
+                    <option value="typescript">TypeScript</option>
+                    <option value="csharp">C#</option>
+                    <option value="cpp">C++</option>
+                    <option value="go">Go</option>
+                    <option value="php">PHP</option>
+                </select>
+            </div>
+
+            <!-- Description -->
+            <div class="mb-3">
+                <label class="block text-sm mb-1">Description (Optional)</label>
+                <input type="text" id="description" placeholder="What the code does..."
+                       class="w-full bg-gray-700 rounded px-3 py-2">
+            </div>
+
+            <!-- Code Area -->
+            <div class="mb-4">
+                <label class="block text-sm mb-1">Code</label>
+                <textarea id="code" rows="10" placeholder="Paste your code here..."
+                          class="w-full bg-gray-700 rounded px-3 py-2 font-mono text-sm"></textarea>
+            </div>
+
+            <!-- Submit Button -->
+            <button id="submitBtn" onclick="submitReview()"
+                    class="w-full bg-blue-600 hover:bg-blue-700 py-2 px-4 rounded font-medium">
+                Run Review
+            </button>
+        </div>
+
+        <!-- Right Panel - Results -->
+        <div class="bg-gray-800 rounded-lg p-5">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="font-semibold">Result</h2>
+                <button onclick="loadHistory()" class="text-sm text-blue-400 hover:underline">History</button>
+            </div>
+
+            <div id="results" class="min-h-[300px]">
+                <p class="text-gray-400 text-center mt-20">Submit your code and let the AI analyze it</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- History Modal -->
+    <div id="historyModal" class="fixed inset-0 bg-black/70 hidden items-center justify-center">
+        <div class="bg-gray-800 rounded-lg p-5 max-w-2xl w-full mx-4 max-h-[70vh] overflow-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="font-semibold">History</h2>
+                <button onclick="closeHistory()" class="text-gray-400 hover:text-white text-xl">&times;</button>
+            </div>
+            <div id="historyList"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const API = '/api/reviews';
+
+    async function submitReview() {
+        const code = document.getElementById('code').value.trim();
+        const language = document.getElementById('language').value;
+        const description = document.getElementById('description').value.trim();
+
+        if (!code) {
+            alert('Please enter code');
+            return;
+        }
+
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = true;
+        btn.textContent = 'Analyzing...';
+
+        try {
+            const res = await fetch(API, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code, language, description })
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) throw new Error(data.message);
+
+            document.getElementById('results').innerHTML = `
+                <div class="text-sm text-gray-400 mb-3">${data.language} • #${data.id}</div>
+                <div class="review-content text-gray-200">${marked.parse(data.review)}</div>
+            `;
+        } catch (err) {
+            document.getElementById('results').innerHTML = `<p class="text-red-400">${err.message}</p>`;
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Run Review';
+        }
+    }
+
+    async function loadHistory() {
+        document.getElementById('historyModal').classList.remove('hidden');
+        document.getElementById('historyModal').classList.add('flex');
+        document.getElementById('historyList').innerHTML = 'Loading...';
+
+        try {
+            const res = await fetch(API);
+            const reviews = await res.json();
+
+            if (reviews.length === 0) {
+                document.getElementById('historyList').innerHTML = '<p class="text-gray-400">No records yet</p>';
+                return;
+            }
+
+            document.getElementById('historyList').innerHTML = reviews.map(r => `
+                <div class="bg-gray-700 rounded p-3 mb-2 cursor-pointer hover:bg-gray-600" onclick="showReview(${r.id})">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-blue-400">${r.language}</span>
+                        <span class="text-gray-400">${new Date(r.createdAt).toLocaleDateString('en-US')}</span>
+                    </div>
+                    <p class="text-sm text-gray-300 truncate mt-1">${r.description || r.code.substring(0, 50)}...</p>
+                </div>
+            `).join('');
+        } catch {
+            document.getElementById('historyList').innerHTML = '<p class="text-red-400">Failed to load</p>';
+        }
+    }
+
+    async function showReview(id) {
+        closeHistory();
+        const res = await fetch(`${API}/${id}`);
+        const data = await res.json();
+        document.getElementById('results').innerHTML = `
+            <div class="text-sm text-gray-400 mb-3">${data.language} • #${data.id}</div>
+            <div class="review-content text-gray-200">${marked.parse(data.review)}</div>
+        `;
+    }
+
+    function closeHistory() {
+        document.getElementById('historyModal').classList.add('hidden');
+        document.getElementById('historyModal').classList.remove('flex');
+    }
+
+    document.getElementById('historyModal').addEventListener('click', e => {
+        if (e.target.id === 'historyModal') closeHistory();
+    });
+</script>
+</body>
+</html>
